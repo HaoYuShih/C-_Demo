@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .container { max-width: 800px; margin: auto; }
+        .api-section { border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; border-radius: 8px; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 0.5em; }
+        input[type="text"], input[type="number"] { width: 95%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ddd; }
+        button { padding: 10px 15px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        pre { background-color: #f4f4f4; padding: 1em; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+        .shared-inputs { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-Protocol API Demo</h1>
+        <p>This page demonstrates interaction with a backend using REST, GraphQL, and WebSockets.</p>
+        <p><strong>Note:</strong> This demo assumes the backend is running on `https://localhost:PORT` or `http://localhost:PORT`. You may need to adjust the port numbers in the script. Since this demo runs from a `file://` URL, you might encounter CORS issues. Run with a local web server or disable CORS in your browser for testing.</p>
+
+        <div class="shared-inputs">
+            <h3>Shared Inputs</h3>
+            <input type="text" id="name" placeholder="Name" value="Jules">
+            <input type="text" id="email" placeholder="Email" value="jules@example.com">
+            <input type="number" id="age" placeholder="Age" value="30">
+        </div>
+
+        <!-- REST API Section -->
+        <div class="api-section">
+            <h2>HTTP (REST) API</h2>
+            <p>Sends data to <code>/api/HttpApi</code> via a POST request.</p>
+            <button onclick="sendRest()">Send REST Request</button>
+            <pre id="rest-response">Response will appear here...</pre>
+        </div>
+
+        <!-- GraphQL Section -->
+        <div class="api-section">
+            <h2>GraphQL API</h2>
+            <p>Sends data to <code>/graphql</code> via a POST request.</p>
+            <button onclick="sendGraphQL()">Send GraphQL Request</button>
+            <pre id="graphql-response">Response will appear here...</pre>
+        </div>
+
+        <!-- WebSocket Section -->
+        <div class="api-section">
+            <h2>WebSocket API</h2>
+            <p>Connects to <code>/ws</code> and sends data.</p>
+            <button onclick="connectWebSocket()" id="ws-connect-btn">Connect WebSocket</button>
+            <button onclick="sendWebSocketMessage()" disabled id="ws-send-btn">Send Message</button>
+            <pre id="websocket-messages">Messages will appear here...</pre>
+        </div>
+    </div>
+
+    <script>
+        // Adjust this to your actual HTTPS port from launchSettings.json
+        const API_BASE_URL = 'https://localhost:7123';
+        // Adjust this for WebSockets
+        const WS_BASE_URL = 'wss://localhost:7123';
+
+        function getPersonData() {
+            return {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                age: parseInt(document.getElementById('age').value, 10)
+            };
+        }
+
+        // --- REST API ---
+        async function sendRest() {
+            const person = getPersonData();
+            const responseElement = document.getElementById('rest-response');
+            responseElement.textContent = 'Sending...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/HttpApi`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(person)
+                });
+                const data = await response.json();
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('REST Error:', error);
+                responseElement.textContent = `Error: ${error.message}. Check console for details. Is the server running and is the port correct?`;
+            }
+        }
+
+        // --- GraphQL API ---
+        async function sendGraphQL() {
+            const person = getPersonData();
+            const responseElement = document.getElementById('graphql-response');
+            responseElement.textContent = 'Sending...';
+
+            const query = `
+                mutation SubmitPerson($name: String!, $email: String!, $age: Int!) {
+                    submitPerson(input: { name: $name, email: $email, age: $age }) {
+                        message
+                    }
+                }`;
+
+            const variables = { name: person.name, email: person.email, age: person.age };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/graphql`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, variables })
+                });
+                const data = await response.json();
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('GraphQL Error:', error);
+                responseElement.textContent = `Error: ${error.message}. Check console for details. Is the server running and is the port correct?`;
+            }
+        }
+
+        // --- WebSocket API ---
+        let socket;
+        const wsMessagesElement = document.getElementById('websocket-messages');
+        const wsConnectBtn = document.getElementById('ws-connect-btn');
+        const wsSendBtn = document.getElementById('ws-send-btn');
+
+        function logWsMessage(message) {
+            wsMessagesElement.textContent += `${new Date().toLocaleTimeString()}: ${message}\n`;
+        }
+
+        function connectWebSocket() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                logWsMessage('Already connected.');
+                return;
+            }
+
+            socket = new WebSocket(`${WS_BASE_URL}/ws`);
+            logWsMessage('Connecting...');
+
+            socket.onopen = function(event) {
+                logWsMessage('Connection established.');
+                wsConnectBtn.disabled = true;
+                wsSendBtn.disabled = false;
+            };
+
+            socket.onmessage = function(event) {
+                logWsMessage(`Server: ${event.data}`);
+            };
+
+            socket.onclose = function(event) {
+                logWsMessage(`Connection closed. Code: ${event.code}, Reason: ${event.reason || 'No reason given'}`);
+                wsConnectBtn.disabled = false;
+                wsSendBtn.disabled = true;
+                socket = null;
+            };
+
+            socket.onerror = function(error) {
+                logWsMessage(`WebSocket Error: ${error.message || 'An unknown error occurred.'}`);
+                console.error('WebSocket Error:', error);
+            };
+        }
+
+        function sendWebSocketMessage() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                logWsMessage('Not connected. Please connect first.');
+                return;
+            }
+            const person = getPersonData();
+            const message = JSON.stringify(person);
+            logWsMessage(`Client: Sending ${message}`);
+            socket.send(message);
+        }
+
+    </script>
+</body>
+</html>
