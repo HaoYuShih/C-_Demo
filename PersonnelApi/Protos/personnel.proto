@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option csharp_namespace = "PersonnelApi.Protos";
+
+package personnel;
+
+// The personnel service definition.
+service Personnel {
+  // Sends a person's data
+  rpc SubmitPerson (PersonRequest) returns (PersonReply);
+}
+
+// The request message containing the person's details.
+message PersonRequest {
+  string name = 1;
+  string email = 2;
+  int32 age = 3;
+}
+
+// The response message containing the status
+message PersonReply {
+  string message = 1;
+}
